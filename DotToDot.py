@@ -18,9 +18,9 @@ TEMP_IMG_NAME = "temp_img.jpg"
 GREEDY_SOLUTIONS_TO_TRY = 50
 
 def timeFunction(function, *args):
-    start = time.clock()
+    start = time.perf_counter()
     returnValue = function(*args)
-    end = time.clock()
+    end = time.perf_counter()
     print ('--- ' + str(function.__name__) + ' --- Time: ' + str(end - start) + ' ---')
     return returnValue
 
@@ -29,6 +29,8 @@ def makeDotToDot(fullFilePath, intermediateSteps = False):
     fileName = os.path.split(fullFilePath)[-1]
     outPathJpg = 'out/jpg/' + fileName
     outPathPdf = 'out/pdf/' + os.path.splitext(fileName)[0] + '.pdf'
+    os.makedirs(os.path.dirname(outPathJpg), exist_ok=True)
+    os.makedirs(os.path.dirname(outPathPdf), exist_ok=True)
 
     imageData = Image.open(fullFilePath)
     width = imageData.width
@@ -106,11 +108,19 @@ def makeMaxSizeDot(fullFilePath, maxDots):
             scaling = float(inputImageDimension) / maxDimension
             width = int(width * scaling)
             height = int(height * scaling)
-            imageData = imageData.resize((width, height), Image.BICUBIC)
+            imageData = imageData.resize((width, height), Image.Resampling.BICUBIC)
 
         imageData.save(TEMP_IMG_NAME)
 
         dotPoints = makeDotToDot(TEMP_IMG_NAME)
         dotsInImage = len(dotPoints)
 
-    out = OutputImage(dotPoints, width, height, True, False, outPathPdf, outPathJpg)
+    OutputImage(dotPoints, width, height, True, False, outPathPdf, outPathJpg)
+
+    temporaryOutputs = [
+        TEMP_IMG_NAME,
+        os.path.join('out', 'jpg', TEMP_IMG_NAME),
+        os.path.join('out', 'pdf', os.path.splitext(TEMP_IMG_NAME)[0] + '.pdf')]
+    for temporaryOutput in temporaryOutputs:
+        if os.path.exists(temporaryOutput):
+            os.remove(temporaryOutput)

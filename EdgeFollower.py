@@ -2,7 +2,7 @@ import sys
 import math
 import numpy as np
 import warnings
-warnings.simplefilter('ignore', np.RankWarning)
+warnings.simplefilter('ignore', np.exceptions.RankWarning)
 
 from DistanceUtils import lineAngle
 from EdgeMatrix import EdgeMatrix
@@ -47,7 +47,7 @@ class EdgeFollower():
         print('Done')
         return traces
 
-    def makeTrace(self, startingPoint, limit = sys.maxint, persistent = True):
+    def makeTrace(self, startingPoint, limit = sys.maxsize, persistent = True):
         self.edgeMatrix.markFalseAt(startingPoint)
         trace = [startingPoint]
         nextNeighbours = self.edgeMatrix.getTrueNeighbours(startingPoint)

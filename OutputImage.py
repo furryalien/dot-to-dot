@@ -1,6 +1,7 @@
 import math
-import cairocffi as cairo
 from PIL import Image, ImageDraw, ImageFont
+from reportlab.pdfbase.pdfmetrics import stringWidth
+from reportlab.pdfgen import canvas
 
 BASE_IMAGE_WIDTH = 5000
 BASE_LIMIT = 7000
@@ -98,18 +99,14 @@ class OutputImage():
 
 
     def drawAsPdf(self, drawLines, path):
-        ps = cairo.PDFSurface(path, int(self.fullWidth), int(self.fullHeight))
-        cr = cairo.Context(ps)
-
-        cr.set_source_rgb(0, 0, 0)
-        cr.set_line_width(2)
-        cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL,
-            cairo.FONT_WEIGHT_NORMAL)
-        cr.set_font_size(int(self.fontSize))
+        cr = canvas.Canvas(path, pagesize=(self.fullWidth, self.fullHeight))
+        cr.setLineWidth(2)
+        cr.setFont("Helvetica", int(self.fontSize))
 
         self.drawPDFPoints(cr)
         if drawLines:
             self.drawPDFLines(cr)
+        cr.save()
 
 
     def drawPDFLines(self, cr):
@@ -130,9 +127,8 @@ class OutputImage():
 
         y1 = p1[1] * self.yScaling + OUTLINE_SPACE
         y2 = p2[1] * self.yScaling + OUTLINE_SPACE
-        cr.move_to(x1, y1)
-        cr.line_to(x2, y2)
-        cr.stroke()
+        cr.setStrokeColorRGB(0, 0, 0)
+        cr.line(x1, self.fullHeight - y1, x2, self.fullHeight - y2)
 
     def drawLines(self, ensureSpace, savePointPositions):
         if not self.drawPoints(ensureSpace, savePointPositions):
@@ -192,16 +188,15 @@ class OutputImage():
         pointSize = 1
 
         r, g, b = self.colourToFloats(colour)
-        cr.set_source_rgb(r, g, b)
-        cr.move_to(x, y)
-        cr.arc(x, y, pointSize, 0, 2 * math.pi)
-        cr.fill()
+        cr.setFillColorRGB(r, g, b)
+        cr.circle(x, self.fullHeight - y, pointSize, stroke=0, fill=1)
 
     def drawPDFText(self, cr, number, point, positionIndex, colour):
         pointX = point[0] * self.xScaling + OUTLINE_SPACE
         pointY = point[1] * self.yScaling + OUTLINE_SPACE
 
-        _, _, textWidth, textHeight, _, _ = cr.text_extents(str(number))
+        textWidth = stringWidth(str(number), "Helvetica", int(self.fontSize))
+        textHeight = self.fontSize
 
         pointSize = 2
 
@@ -212,10 +207,9 @@ class OutputImage():
             (pointX - pointSize - textWidth, pointY + pointSize + textHeight)]
 
         x, y = possibleTextPositions[positionIndex]
-        cr.move_to(x, y)
         r, g, b = self.colourToFloats(colour)
-        cr.set_source_rgb(r, g, b)
-        cr.show_text(str(number))
+        cr.setFillColorRGB(r, g, b)
+        cr.drawString(x, self.fullHeight - y, str(number))
 
     def drawPointWithNumber(self, point, number, color, ensureSpace, savePointPositions):
         pointSize = 1
@@ -235,7 +229,9 @@ class OutputImage():
         return True
 
     def chooseTextPoint(self, pointX, pointY, number, ensureSpace):
-        textWidth, textHeight = self.draw.textsize(str(number), self.font)
+        left, top, right, bottom = self.draw.textbbox((0, 0), str(number), font=self.font)
+        textWidth = right - left
+        textHeight = bottom - top
         possibleTextPositions = [
             (pointX + 2, pointY + 2),
             (pointX + 2, pointY - 2 - textHeight),
