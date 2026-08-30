@@ -15,10 +15,9 @@ MAXIMUM_IMAGE_SIZE = 1920
 
 class EdgeDetector():
 
-    def __init__(self, fileName):
-        self.fileName = fileName
-        self.image = cv2.imread(fileName)
-        grayImage = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+    def __init__(self, imageData):
+        self.image = np.array(imageData.convert('RGB'))
+        grayImage = cv2.cvtColor(self.image, cv2.COLOR_RGB2GRAY)
         self.blurred = cv2.GaussianBlur(grayImage,
             (GAUSSIAN_KERNEL_SIZE, GAUSSIAN_KERNEL_SIZE),
             GAUSSIAN_SIGMA)

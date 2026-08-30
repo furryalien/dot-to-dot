@@ -1,6 +1,6 @@
 import os
-import sys
 import time
+import pymupdf
 from PIL import Image
 
 from EdgeDetector import EdgeDetector
@@ -16,6 +16,24 @@ from IntermediateImage import IntermediateImage
 
 TEMP_IMG_NAME = "temp_img.jpg"
 GREEDY_SOLUTIONS_TO_TRY = 50
+MIN_INPUT_DIMENSION = 400
+INPUT_DIMENSION_STEP = 200
+
+def loadInputImage(fullFilePath, pdfDpi=300):
+    if os.path.splitext(fullFilePath)[1].lower() == '.pdf':
+        with pymupdf.open(fullFilePath) as document:
+            if document.page_count == 0:
+                raise ValueError('PDF contains no pages: ' + fullFilePath)
+            pixmap = document[0].get_pixmap(dpi=pdfDpi, alpha=False)
+            return Image.frombytes(
+                'RGB', (pixmap.width, pixmap.height), pixmap.samples)
+
+    with Image.open(fullFilePath) as image:
+        return image.convert('RGB')
+
+def getOutputPaths(fullFilePath):
+    fileName = os.path.splitext(os.path.split(fullFilePath)[-1])[0]
+    return 'out/jpg/' + fileName + '.jpg', 'out/pdf/' + fileName + '.pdf'
 
 def timeFunction(function, *args):
     start = time.perf_counter()
@@ -26,18 +44,16 @@ def timeFunction(function, *args):
 
 def makeDotToDot(fullFilePath, intermediateSteps = False):
     # Getting proper in/out names and image dimensions.
-    fileName = os.path.split(fullFilePath)[-1]
-    outPathJpg = 'out/jpg/' + fileName
-    outPathPdf = 'out/pdf/' + os.path.splitext(fileName)[0] + '.pdf'
+    outPathJpg, outPathPdf = getOutputPaths(fullFilePath)
     os.makedirs(os.path.dirname(outPathJpg), exist_ok=True)
     os.makedirs(os.path.dirname(outPathPdf), exist_ok=True)
 
-    imageData = Image.open(fullFilePath)
+    imageData = loadInputImage(fullFilePath)
     width = imageData.width
     height = imageData.height
 
     # Canny edge detection step
-    edgeDetector = EdgeDetector(fullFilePath)
+    edgeDetector = EdgeDetector(imageData)
     edgesNumberMatrix = timeFunction(edgeDetector.getCannyEdges)
 
     edgeMatrix = EdgeMatrix(edgesNumberMatrix)
@@ -87,20 +103,17 @@ def makeDotToDot(fullFilePath, intermediateSteps = False):
 
     return cleanPoints
 
-def makeMaxSizeDot(fullFilePath, maxDots):
-    inputImageDimension = 1200
+def makeMaxSizeDot(fullFilePath, maxDots, maxInputDimension=1200, pdfDpi=300):
+    inputImageDimension = maxInputDimension
     dotsInImage = maxDots + 1
 
-    fileName = os.path.split(fullFilePath)[-1]
-    outPathJpg = 'out/jpg/' + fileName
-    outPathPdf = 'out/pdf/' + os.path.splitext(fileName)[0] + '.pdf'
+    outPathJpg, outPathPdf = getOutputPaths(fullFilePath)
 
     # Repeat complete makeDotToDot process, decreasing image resolution, until
     # few enough dots
-    while(dotsInImage > maxDots and inputImageDimension > 300):
-        inputImageDimension -= 200
+    while(dotsInImage > maxDots and inputImageDimension >= MIN_INPUT_DIMENSION):
         print('Image Dimensions now at: ' + str(inputImageDimension))
-        imageData = Image.open(fullFilePath)
+        imageData = loadInputImage(fullFilePath, pdfDpi)
         width = imageData.width
         height = imageData.height
         maxDimension = width if width > height else height
@@ -114,6 +127,7 @@ def makeMaxSizeDot(fullFilePath, maxDots):
 
         dotPoints = makeDotToDot(TEMP_IMG_NAME)
         dotsInImage = len(dotPoints)
+        inputImageDimension -= INPUT_DIMENSION_STEP
 
     OutputImage(dotPoints, width, height, True, False, outPathPdf, outPathJpg)
 
